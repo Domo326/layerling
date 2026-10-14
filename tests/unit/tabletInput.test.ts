@@ -132,3 +132,32 @@ describe("shortcut buttons", () => {
     expect(keys).toEqual(["mod+z", "Delete"]);
   });
 });
+
+describe("three-finger swipe", () => {
+  function swipe(dx: number) {
+    [1, 2, 3].forEach((id) => pointer("pointerdown", { pointerType: "touch", pointerId: 20 + id, clientX: 100 * id, clientY: 300 }));
+    for (let step = 1; step <= 6; step += 1) {
+      [1, 2, 3].forEach((id) => pointer("pointermove", { pointerType: "touch", pointerId: 20 + id, clientX: 100 * id + (dx * step) / 6, clientY: 300 }));
+    }
+    [1, 2, 3].forEach((id) => pointer("pointerup", { pointerType: "touch", pointerId: 20 + id, clientX: 100 * id + dx, clientY: 300 }));
+  }
+
+  it("undoes when swiped left and redoes when swiped right, once per swipe", () => {
+    const keys: string[] = [];
+    const listener = (event: KeyboardEvent) => keys.push(event.key);
+    window.addEventListener("keydown", listener);
+    swipe(-120);
+    swipe(120);
+    window.removeEventListener("keydown", listener);
+    expect(keys).toEqual(["z", "y"]);
+  });
+
+  it("ignores a short or mostly vertical three-finger move", () => {
+    const keys: string[] = [];
+    const listener = (event: KeyboardEvent) => keys.push(event.key);
+    window.addEventListener("keydown", listener);
+    swipe(-30);
+    window.removeEventListener("keydown", listener);
+    expect(keys).toEqual([]);
+  });
+});

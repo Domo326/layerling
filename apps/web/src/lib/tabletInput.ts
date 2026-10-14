@@ -57,6 +57,59 @@ const rejectedTouches = new Set<number>();
 let installed = false;
 let releaseTimer: number | null = null;
 let gestureUsedModifier = false;
+/** Fingers on the glass, for the three-finger swipe (undo / redo). */
+const fingers = new Map<number, { x: number; y: number }>();
+let swipe: { startX: number; startY: number; fired: boolean } | null = null;
+const SWIPE_TRIGGER_PIXELS = 70;
+
+function fingerCentroid() {
+  let x = 0;
+  let y = 0;
+  fingers.forEach((finger) => {
+    x += finger.x;
+    y += finger.y;
+  });
+  return { x: x / fingers.size, y: y / fingers.size };
+}
+
+/**
+ * Three fingers swiped left undo, swiped right redo (as in Shapr3D and
+ * Procreate). Only the sideways part counts, and once per gesture.
+ */
+function trackThreeFingerSwipe(event: PointerEvent) {
+  if (event.pointerType !== "touch") return;
+  if (event.type === "pointerdown") {
+    // A palm resting while the pen is down is not a swipe.
+    if (activePens.size > 0) return;
+    fingers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (fingers.size === 3) {
+      const centre = fingerCentroid();
+      swipe = { startX: centre.x, startY: centre.y, fired: false };
+    } else if (fingers.size > 3) {
+      swipe = null;
+    }
+    return;
+  }
+  if (event.type === "pointermove") {
+    if (!fingers.has(event.pointerId)) return;
+    fingers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (!swipe || swipe.fired || fingers.size !== 3) return;
+    const centre = fingerCentroid();
+    const dx = centre.x - swipe.startX;
+    const dy = centre.y - swipe.startY;
+    if (Math.abs(dx) >= SWIPE_TRIGGER_PIXELS && Math.abs(dy) < Math.abs(dx) * 0.7) {
+      swipe.fired = true;
+      if (dx < 0) sendShortcut("z", { ctrl: true, code: "KeyZ" });
+      else sendShortcut("y", { ctrl: true, code: "KeyY" });
+    }
+    return;
+  }
+  if (event.type === "pointerup" || event.type === "pointercancel") {
+    fingers.delete(event.pointerId);
+    if (fingers.size < 3 && swipe && !swipe.fired) swipe = null;
+    if (fingers.size === 0) swipe = null;
+  }
+}
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -167,6 +220,7 @@ function overlayModifiers(event: Event) {
 
 function handlePointerLike(event: Event) {
   const pointer = event instanceof PointerEvent ? event : null;
+  if (pointer) trackThreeFingerSwipe(pointer);
 
   // Track pens and turn Pencil mode on the first time one touches down.
   if (pointer?.pointerType === "pen") {

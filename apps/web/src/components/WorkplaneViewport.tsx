@@ -259,12 +259,27 @@ const LONG_PRESS_MS = 520;
 const LONG_PRESS_SLOP_PIXELS = 10;
 /** Rings searched around a fingertip for a transform handle it nearly hit. */
 const TOUCH_HANDLE_SEARCH_RADII = [10, 20];
+/** A tap: lifted within this time ... */
+const TAP_MAX_MS = 450;
+/** ... and this close to where it landed. */
+const TAP_SLOP_PIXELS = 10;
+/** Two taps this close in time and space make a double tap. */
+const DOUBLE_TAP_MS = 480;
+const DOUBLE_TAP_PIXELS = 28;
 const PICK_TOLERANCE_RAYS = 8;
 const RENDER_LAYER_MODIFIERS = 3;
 const RENDER_LAYER_PREVIEWS = 4;
 const BVH_PICKING_TRIANGLE_THRESHOLD = 512;
 /** How far the pointer goes before a pressed shape starts to move, in screen pixels - as the marquee. */
 const DRAG_START_PIXELS = 5;
+/** A pen tip wobbles more than a mouse; it must travel this far before a body moves. */
+const PEN_DRAG_START_PIXELS = 9;
+/** Pen on the empty plate: moving this far decides between turning the view and the box. */
+const PEN_DECIDE_PIXELS = 7;
+/** Pen held still this long on the empty plate, then dragged: selection box instead of turning. */
+const PEN_BOX_HOLD_MS = 380;
+/** Degrees the view turns per pixel of pen travel, matching a one-finger turn. */
+const PEN_ORBIT_DEGREES_PER_PIXEL = 0.32;
 const importedGeometryCache = new WeakMap<
   NonNullable<WorkplaneShape["importedMesh"]>,
   { geometry: THREE.BufferGeometry; edges: Map<number, THREE.EdgesGeometry> }
@@ -560,6 +575,8 @@ declare global {
     layerlingCaptureView?: (face?: LayerlingMcpViewFace) => Promise<string> | string;
     /** Turns the view about its centre: azimuth around the vertical, polar towards or away from straight down. */
     layerlingOrbitView?: (azimuthDegrees: number, polarDegrees: number) => void;
+    /** Tests on slow emulated renderers widen the tap windows; never set by the app. */
+    layerlingTapTiming?: { tapMs?: number; doubleTapMs?: number };
     layerlingCaptureImage?: (options?: { plate?: boolean; transparent?: boolean; scale?: number }) => string;
     /** The section view for MCP: applies what is given, returns the settings it ends on and the plane's range. */
     layerlingSectionView?: (patch: Partial<SectionPlaneSettings> & { center?: boolean }) => { settings: SectionPlaneSettings; bounds: { min: number; max: number; center: number } };
@@ -620,6 +637,12 @@ type MarqueeState = {
   currentY: number;
   additive: boolean;
   hasMoved: boolean;
+  /**
+   * A pen on the empty plate, Shapr3D style: a quick drag turns the view,
+   * holding still first and then dragging draws the selection box, and a tap
+   * clears the selection. "pending" until the pen shows which it is.
+   */
+  pen?: { mode: "pending" | "orbit" | "box"; startedAt: number; lastClientX: number; lastClientY: number };
 };
 
 /** Eine gleichbleibende leere Liste, damit die Eigenschaft nicht jedes Bild neu wird. */
@@ -4281,6 +4304,8 @@ export function WorkplaneViewport({
     if (!state || !host) return;
     const openSketch = (event: MouseEvent) => {
       if (event.button !== 0 || pivotPickModeRef.current) return;
+      // A double tap already did this; Safari may still send its own dblclick.
+      if (performance.now() - lastDoubleTapAtRef.current < 600) return;
       const id = pickShapeIdAt(state, event.clientX, event.clientY);
       const shape = id ? shapesRef.current.find((candidate) => candidate.id === id) : undefined;
       if (!shape || shape.locked) return;
@@ -6449,6 +6474,27 @@ export function WorkplaneViewport({
   }, [cancelLongPress]);
 
   /**
+   * Pen held still on the empty plate: after PEN_BOX_HOLD_MS a ring under the
+   * tip says "now drag for a box".
+   */
+  const penHoldTimerRef = useRef<number | null>(null);
+  const [penHoldRing, setPenHoldRing] = useState<{ x: number; y: number } | null>(null);
+  const clearPenBoxHold = useCallback(() => {
+    if (penHoldTimerRef.current !== null) window.clearTimeout(penHoldTimerRef.current);
+    penHoldTimerRef.current = null;
+    setPenHoldRing(null);
+  }, []);
+  const startPenBoxHold = useCallback((clientX: number, clientY: number) => {
+    clearPenBoxHold();
+    penHoldTimerRef.current = window.setTimeout(() => {
+      penHoldTimerRef.current = null;
+      const marquee = marqueeRef.current;
+      const rect = threeRef.current?.renderer.domElement.getBoundingClientRect();
+      if (marquee?.pen?.mode === "pending" && rect) setPenHoldRing({ x: clientX - rect.left, y: clientY - rect.top });
+    }, PEN_BOX_HOLD_MS);
+  }, [clearPenBoxHold]);
+
+  /**
    * Touch mode: is this finger on nothing it could edit? Tools that wait for a
    * tap on the plate (placing a shape, tape measure, pivots, notes ...) keep
    * every tap for themselves.
@@ -6506,7 +6552,9 @@ export function WorkplaneViewport({
           return;
         }
       }
-      if ((event.pointerType === "touch" || event.pointerType === "pen") && event.button === 0 && !event.ctrlKey && !event.metaKey) {
+      // Holding still opens the menu for a finger. A pen holds still to aim, and
+      // its hold means "box select" on the plate; its menu is the quick bar.
+      if (event.pointerType === "touch" && event.button === 0 && !event.ctrlKey && !event.metaKey) {
         startLongPress(event.pointerId, event.pointerType, event.clientX, event.clientY);
       }
       // The right button turns the view; only a press that is let go where it
@@ -6806,8 +6854,17 @@ export function WorkplaneViewport({
           currentY: startY,
           additive,
           hasMoved: false,
+          pen: event.pointerType === "pen" && !additive
+            ? { mode: "pending", startedAt: performance.now(), lastClientX: event.clientX, lastClientY: event.clientY }
+            : undefined,
         };
-        setMarqueeFromState(marqueeRef.current);
+        if (marqueeRef.current.pen) {
+          // No box yet: the pen has not said whether it means the view or a box.
+          cancelLongPress();
+          startPenBoxHold(event.clientX, event.clientY);
+        } else {
+          setMarqueeFromState(marqueeRef.current);
+        }
         state.controls.enabled = false;
         onInteractionActiveChange?.(true);
         return;
@@ -6981,7 +7038,7 @@ export function WorkplaneViewport({
       toFreePlacementWorkplanePoint,
       toRawPlanePoint,
       onAddShape,
-    , startLongPress, fingerOnEmptyPlate],
+    , startLongPress, fingerOnEmptyPlate, cancelLongPress, startPenBoxHold],
   );
 
   const handlePointerMove = useCallback(
@@ -7085,6 +7142,31 @@ export function WorkplaneViewport({
           return;
         }
         const rect = state.renderer.domElement.getBoundingClientRect();
+        const pen = marquee.pen;
+        if (pen && marquee.pointerId === event.pointerId) {
+          if (pen.mode === "pending") {
+            const travelled = Math.hypot(event.clientX - (rect.left + marquee.startX), event.clientY - (rect.top + marquee.startY));
+            if (travelled < PEN_DECIDE_PIXELS) return;
+            const held = performance.now() - pen.startedAt >= PEN_BOX_HOLD_MS;
+            pen.mode = held ? "box" : "orbit";
+            clearPenBoxHold();
+            if (pen.mode === "orbit") {
+              // Continue from where the pen first touched, so nothing is lost.
+              pen.lastClientX = rect.left + marquee.startX;
+              pen.lastClientY = rect.top + marquee.startY;
+            }
+          }
+          if (pen.mode === "orbit") {
+            const dx = event.clientX - pen.lastClientX;
+            const dy = event.clientY - pen.lastClientY;
+            pen.lastClientX = event.clientX;
+            pen.lastClientY = event.clientY;
+            marquee.hasMoved = true;
+            // Same directions as a finger drag: right turns the plate right, down tips it back.
+            window.layerlingOrbitView?.(-dx * PEN_ORBIT_DEGREES_PER_PIXEL, -dy * PEN_ORBIT_DEGREES_PER_PIXEL);
+            return;
+          }
+        }
         marquee.currentX = event.clientX - rect.left;
         marquee.currentY = event.clientY - rect.top;
         marquee.hasMoved = marquee.hasMoved || Math.hypot(marquee.currentX - marquee.startX, marquee.currentY - marquee.startY) > 5;
@@ -7099,7 +7181,8 @@ export function WorkplaneViewport({
       // A shaky click or double click must not nudge the part: it moves once the pointer has
       // gone a few pixels, and then follows it from where the drag began (#150).
       if (!drag.started) {
-        if (Math.hypot(event.clientX - drag.startClient.x, event.clientY - drag.startClient.y) < DRAG_START_PIXELS) return;
+        const startPixels = event.pointerType === "pen" ? PEN_DRAG_START_PIXELS : DRAG_START_PIXELS;
+        if (Math.hypot(event.clientX - drag.startClient.x, event.clientY - drag.startClient.y) < startPixels) return;
         drag.started = true;
       }
 
@@ -7181,7 +7264,7 @@ export function WorkplaneViewport({
         threeRef.current.needsRender = true;
       }
     },
-    [pickPlacementSurface, setMarqueeFromState, toPlacementWorkplanePoint, toRawPlanePoint, moveCruiseGhost, updateModifierEdgeHover, updateTapeHover, updateTransform, cancelLongPress],
+    [pickPlacementSurface, setMarqueeFromState, toPlacementWorkplanePoint, toRawPlanePoint, moveCruiseGhost, updateModifierEdgeHover, updateTapeHover, updateTransform, cancelLongPress, clearPenBoxHold],
   );
 
   useEffect(() => {
@@ -7379,6 +7462,13 @@ export function WorkplaneViewport({
         }
         marqueeRef.current = null;
         setMarqueeFromState(null);
+        clearPenBoxHold();
+        if (marquee.pen?.mode === "orbit") {
+          // The pen turned the view; the selection stays as it was.
+          if (state) state.controls.enabled = true;
+          onInteractionActiveChange?.(false);
+          return;
+        }
         if (marquee.hasMoved) {
           const rect = {
             left: Math.min(marquee.startX, marquee.currentX),
@@ -7478,7 +7568,7 @@ export function WorkplaneViewport({
       }
       onInteractionActiveChange?.(false);
     },
-    [clearMoveDimensions, onDuplicateShapesMoved, onInteractionActiveChange, onSelectShape, onUpdateShape, rememberResizeAnchor, setMarqueeFromState, shapesInMarquee, suppressCornerEditAfterDrag, suppressLiftEditAfterDrag, onShapeContextMenu, pickShape, cancelLongPress],
+    [clearMoveDimensions, onDuplicateShapesMoved, onInteractionActiveChange, onSelectShape, onUpdateShape, rememberResizeAnchor, setMarqueeFromState, shapesInMarquee, suppressCornerEditAfterDrag, suppressLiftEditAfterDrag, onShapeContextMenu, pickShape, cancelLongPress, clearPenBoxHold],
   );
 
   const handleDrop = useCallback(
@@ -7548,6 +7638,87 @@ export function WorkplaneViewport({
     syncViewCube(state, viewCubeRef.current);
     state.needsRender = true;
   }, []);
+
+  /**
+   * Taps with a pen or finger, watched on the host before anything else sees
+   * them. A tap is a touch that lifts quickly where it landed.
+   * - Every tap is announced ("layerling:tap") so the quick bar can appear.
+   * - Two taps on the same spot: open the group or sketch, as a double click
+   *   does; a finger in Pencil mode zooms to the body instead.
+   * - Pencil mode hands fingers to the camera at once, so a finger tap would
+   *   select nothing; here it selects (or clears) like a pen tap.
+   */
+  const focusSelectionRef = useRef(focusSelection);
+  focusSelectionRef.current = focusSelection;
+  const lastDoubleTapAtRef = useRef(0);
+  useEffect(() => {
+    const host = hostRef.current;
+    const state = threeRef.current;
+    if (!host || !state) return;
+    const downs = new Map<number, { x: number; y: number; at: number; type: string; crowded: boolean }>();
+    let lastTap: { x: number; y: number; at: number; type: string; shapeId: string | null } | null = null;
+    const onDown = (event: PointerEvent) => {
+      // The hand-over to the camera re-sends a finger's pointerdown; that copy
+      // is not a second finger.
+      if (event.pointerType === "mouse" || !event.isTrusted || downs.has(event.pointerId)) return;
+      const crowded = downs.size > 0;
+      downs.forEach((down) => { down.crowded = true; });
+      downs.set(event.pointerId, { x: event.clientX, y: event.clientY, at: performance.now(), type: event.pointerType, crowded });
+    };
+    const onUp = (event: PointerEvent) => {
+      const down = downs.get(event.pointerId);
+      downs.delete(event.pointerId);
+      if (!down || down.crowded) return;
+      const now = performance.now();
+      const timing = window.layerlingTapTiming;
+      const tapMaxMs = timing?.tapMs ?? TAP_MAX_MS;
+      const doubleTapMs = timing?.doubleTapMs ?? DOUBLE_TAP_MS;
+      if (now - down.at > tapMaxMs || Math.hypot(event.clientX - down.x, event.clientY - down.y) > TAP_SLOP_PIXELS) return;
+      const shapeId = pickShapeIdAt(state, event.clientX, event.clientY);
+      const fingerInPencilMode = event.pointerType === "touch" && isPencilMode();
+      const busyTool = Boolean(
+        cruiseAssetRef.current || carryIdsRef.current?.length || workplaneModeRef.current || splitActiveRef.current
+        || modifierActiveRef.current || tapeModeRef.current || noteModeRef.current || pivotPickModeRef.current
+        || layFlatPickModeRef.current || mateFacePickRef.current || cornerRulerModeRef.current,
+      );
+      const isDouble = Boolean(lastTap && lastTap.type === event.pointerType && now - lastTap.at < doubleTapMs
+        && Math.hypot(event.clientX - lastTap.x, event.clientY - lastTap.y) < DOUBLE_TAP_PIXELS && lastTap.shapeId === shapeId);
+      lastTap = isDouble ? null : { x: event.clientX, y: event.clientY, at: now, type: event.pointerType, shapeId };
+      if (busyTool) return;
+      if (fingerInPencilMode && !isDouble) {
+        if (shapeId) onSelectShape(shapeId, event.shiftKey ? "toggle" : undefined);
+        else if (!event.shiftKey) onSelectShape(null);
+      }
+      if (isDouble && shapeId) {
+        lastDoubleTapAtRef.current = now;
+        if (fingerInPencilMode) {
+          focusSelectionRef.current();
+        } else {
+          const shape = shapesRef.current.find((candidate) => candidate.id === shapeId);
+          const settings = workspaceRef.current;
+          if (shape && !shape.locked) {
+            if (shape.sketchProfile && settings.doubleClickOpensSketch !== false) onEditSketchRef.current?.();
+            else if (shape.groupedShapes?.length && settings.doubleClickOpensGroup !== false) onOpenGroupRef.current?.(shape.id);
+          }
+        }
+        window.dispatchEvent(new CustomEvent("layerling:tap", { detail: { clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType, shapeId: null } }));
+        return;
+      }
+      // Let the selection settle first, then tell the quick bar.
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("layerling:tap", { detail: { clientX: event.clientX, clientY: event.clientY, pointerType: event.pointerType, shapeId } }));
+      }, 0);
+    };
+    const onCancel = (event: PointerEvent) => downs.delete(event.pointerId);
+    host.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointerup", onUp, true);
+    window.addEventListener("pointercancel", onCancel, true);
+    return () => {
+      host.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointerup", onUp, true);
+      window.removeEventListener("pointercancel", onCancel, true);
+    };
+  }, [onSelectShape]);
 
   const resetView = useCallback(() => {
     const state = threeRef.current;
@@ -8508,6 +8679,7 @@ export function WorkplaneViewport({
             onPointerLeave={handlePointerLeave}
           />
           {!workplaneMode && !splitActive && marqueeRect ? <div className="selection-marquee" style={marqueeRect} /> : null}
+          {penHoldRing ? <div className="pen-hold-ring" style={{ left: penHoldRing.x, top: penHoldRing.y }} aria-hidden="true" /> : null}
           {!workplaneMode && !splitActive && moveDimensionsEnabled && moveDimensionOverlay ? (
             <MoveDimensionOverlay
               overlay={moveDimensionOverlay}

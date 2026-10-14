@@ -2,6 +2,7 @@
 
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { TabletBar } from "@/components/TabletBar";
+import { QuickActionBar } from "@/components/QuickActionBar";
 import { AlertTriangle, Check, Percent, Circle as CircleIcon, CloudUpload, Download, Eye, EyeOff, FilePlus2, FolderOpen, Hexagon as HexagonIcon, Info, ListTree, Pencil, Pentagon as PentagonIcon, Search, Square as SquareIcon, Star as StarIcon, Triangle as TriangleIcon, X } from "lucide-react";
 import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -11012,6 +11013,21 @@ export function LayerlingEditor({
           />
         ) : null}
         {editorOpen ? <TabletBar /> : null}
+        {editorOpen && historyViewIndex === null && !sketchActive ? (
+          <QuickActionBar
+            selectionCount={selectedShapes.length}
+            allHoles={selectedShapes.length > 0 && selectedShapes.every((shape) => shape.hole)}
+            canGroup={selectedShapes.length >= 2}
+            canUngroup={selectedShapes.length === 1 && Boolean(selectedShapes[0].groupedShapes?.length)}
+            onDelete={deleteSelected}
+            onDuplicate={duplicateSelected}
+            onToggleHole={() => setSelectionHoleMode(!(selectedShapes.length > 0 && selectedShapes.every((shape) => shape.hole)))}
+            onGroup={() => { void groupSelected(); }}
+            onUngroup={ungroupSelected}
+            onFillet={() => startEdgeModifier("fillet")}
+            onMore={(clientX, clientY) => setShapeContextMenu({ x: clientX, y: clientY, onShape: true })}
+          />
+        ) : null}
         {toolbarMode === "sketch" && sketchActive ? (
           <SketchWorkspace
             profile={sketchProfile}

@@ -29,18 +29,44 @@ layout** (Automatic / Always on / Off).
 
 Switch with the mode button in the bottom bar (☝️ Touch / ✏️ Pencil) or in
 **Settings → Appearance → Touch input**. Pencil mode switches on by itself the
-first time a pen touches the screen.
+first time a pen touches the screen. The pen follows Shapr3D's rule, "your
+finger is for the view, the Pencil is for creating", and behaves the same in
+both modes.
+
+### The pen
+
+| Pen | Does |
+| --- | --- |
+| Tap a shape | Selects it and shows the quick bar |
+| Tap empty space | Clears the selection |
+| Quick drag on empty space | Turns the view (like a finger) |
+| Hold still ~⅓ s, then drag | Selection box (a ring shows when it is ready) |
+| Drag a shape or handle | Moves / resizes it (ignores small wobbles) |
+| Double-tap a group or sketch | Opens it for editing |
+
+### Fingers
 
 | Gesture | Touch mode | Pencil mode |
 | --- | --- | --- |
-| Pen / Apple Pencil | same as a mouse | select, drag, handles, sketch |
-| One finger on a shape or handle | moves / resizes it | turns the view |
-| One finger on the empty plate | turns the view | turns the view |
-| Two fingers | pan, pinch to zoom | pan, pinch to zoom |
-| Palm while the pen is down | — | ignored |
-| Hold still (finger or pen) | right-click menu | right-click menu |
+| Tap a shape | Selects it | Selects it |
+| Tap empty space | Clears the selection | Clears the selection |
+| One finger on a shape or handle | Moves / resizes it | Turns the view |
+| One finger on empty space | Turns the view | Turns the view |
+| Two fingers | Pan, pinch to zoom | Pan, pinch to zoom |
+| Double-tap a shape | Opens a group / sketch | Zooms to the shape |
+| Hold still on a shape | Right-click menu | — (use the quick bar's More) |
+| Three fingers swipe left / right | Undo / redo | Undo / redo |
+| Palm while the pen is down | — | Ignored |
 
-Fingers also get a little extra reach on the small transform handles.
+### Quick bar
+
+Tapping a shape with the pen or a finger shows a small bar beside it: **Copy,
+Hole/Solid, Group** (several selected) or **Ungroup** (one group), **Round**
+(fillet), **More** (the full right-click menu) and **Delete**. It goes away
+when you touch the plate again.
+
+The Apple Pencil Pro squeeze and the barrel double-tap only reach Apple's
+native apps, not web pages, so they do nothing here.
 
 ## Tablet keys
 

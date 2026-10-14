@@ -7744,6 +7744,31 @@ html:where([data-theme="dark"][data-palette="graphite"])[data-phone="on"] .shape
   background: color-mix(in srgb, var(--primary) 10%, var(--tile));
 }
 
+:where(html[data-theme="dark"][data-palette="graphite"]) .pen-hold-ring {
+  border: 2px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .quick-action-bar {
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  box-shadow: 0 10px 26px rgba(58, 58, 58, 0.22);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .quick-action-bar button {
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .quick-action-bar button:active {
+  background: var(--tile-hover);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .quick-action-bar button.is-danger {
+  color: var(--filament-coral);
+}
+
 :where(html[data-theme="dark"][data-palette="graphite"]) .toolbar-section-tools,
 :where(html[data-theme="dark"][data-palette="graphite"]) .toolbar-section .action-buttons {
   background: var(--toolbar-tile);

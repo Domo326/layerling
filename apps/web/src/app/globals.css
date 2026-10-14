@@ -16530,3 +16530,80 @@ html[data-phone="on"] .edge-modifier-panel {
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 10%, var(--tile));
 }
+
+/* Pen held still on the empty plate: drag now for a selection box. */
+.pen-hold-ring {
+  position: absolute;
+  z-index: 7;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  pointer-events: none;
+  animation: pen-hold-ring-in 160ms ease-out;
+}
+
+@keyframes pen-hold-ring-in {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* Quick actions beside a tapped body (QuickActionBar). */
+.quick-action-bar {
+  position: fixed;
+  z-index: 55;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  box-shadow: 0 10px 26px rgba(75, 56, 35, 0.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-family: var(--font-ui);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  animation: quick-action-in 120ms ease-out;
+}
+
+.quick-action-bar button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 52px;
+  height: 50px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.quick-action-bar button:active {
+  background: var(--tile-hover);
+  transform: scale(0.95);
+}
+
+.quick-action-bar button.is-danger {
+  color: var(--filament-coral);
+}
+
+@keyframes quick-action-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+}
