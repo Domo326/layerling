@@ -27,6 +27,7 @@ import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettings
 import { appThemePalette, type AppThemePalette, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
 import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/cadBakeMetadata";
 import { t } from "@/lib/i18n";
+import { isPencilMode } from "@/lib/tabletInput";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import { useLanguage } from "@/lib/useLanguage";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
@@ -251,6 +252,10 @@ const RENDER_LAYER_SHAPES = 1;
 /** How far beside a body a press may land and still mean it, in screen pixels: a fingertip covers more than a mouse pointer. */
 const PICK_TOLERANCE_PIXELS = 6;
 const PICK_TOLERANCE_PIXELS_TOUCH = 16;
+/** How long a finger or the pen rests before the right-click menu opens. */
+const LONG_PRESS_MS = 520;
+/** Movement allowed during that rest before it counts as a drag instead. */
+const LONG_PRESS_SLOP_PIXELS = 10;
 const PICK_TOLERANCE_RAYS = 8;
 const RENDER_LAYER_MODIFIERS = 3;
 const RENDER_LAYER_PREVIEWS = 4;
@@ -3066,6 +3071,12 @@ export function WorkplaneViewport({
    */
   const touchPointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const rightPressRef = useRef<{ x: number; y: number } | null>(null);
+  // Tablets have no right button: holding a finger or the pen still opens the
+  // same menu a right click would.
+  const longPressRef = useRef<{ pointerId: number; pointerType: string; x: number; y: number; timer: number } | null>(null);
+  const longPressFiredRef = useRef<number | null>(null);
+  const openContextMenuAtRef = useRef<(clientX: number, clientY: number, pointerType: string) => void>(() => {});
+  const cancelGestureForCameraRef = useRef<() => void>(() => {});
   /** Solange wahr, gehoert jeder Finger der Kamera und nichts wird ausgewaehlt. */
   const cameraTouchRef = useRef(false);
   const touchRotateRef = useRef(false);
@@ -6381,6 +6392,35 @@ export function WorkplaneViewport({
     };
   }, []);
 
+  const cancelLongPress = useCallback(() => {
+    const longPress = longPressRef.current;
+    if (!longPress) return;
+    window.clearTimeout(longPress.timer);
+    longPressRef.current = null;
+  }, []);
+
+  const startLongPress = useCallback((pointerId: number, pointerType: string, x: number, y: number) => {
+    cancelLongPress();
+    const timer = window.setTimeout(() => {
+      const longPress = longPressRef.current;
+      longPressRef.current = null;
+      if (!longPress || longPress.pointerId !== pointerId) return;
+      // A handle being dragged or a tool waiting for a click keeps the press for itself.
+      if (transformRef.current || splitDragRef.current || cameraTouchRef.current) return;
+      if (modifierActiveRef.current || tapeModeRef.current || workplaneModeRef.current || splitActiveRef.current) return;
+      longPressFiredRef.current = pointerId;
+      cancelGestureForCameraRef.current();
+      if (threeRef.current) threeRef.current.controls.enabled = true;
+      try {
+        navigator.vibrate?.(12);
+      } catch {
+        // Vibration is a nicety (Android); iPadOS has none.
+      }
+      openContextMenuAtRef.current(longPress.x, longPress.y, longPress.pointerType);
+    }, LONG_PRESS_MS);
+    longPressRef.current = { pointerId, pointerType, x, y, timer };
+  }, [cancelLongPress]);
+
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       // Wer auf die Arbeitsflaeche klickt, ist mit dem Schreiben fertig. Von
@@ -6402,7 +6442,8 @@ export function WorkplaneViewport({
       if (event.pointerType === "touch") {
         touchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (cameraTouchRef.current) return;
-        const wantsCamera = touchPointersRef.current.size >= 2 || touchRotateRef.current;
+        // In Pencil mode the pen edits and every finger belongs to the camera.
+        const wantsCamera = touchPointersRef.current.size >= 2 || touchRotateRef.current || isPencilMode();
         // Wer gerade an einem Anfasser zieht, meint auch das - dann bleibt
         // alles, wie es ist.
         if (wantsCamera && !transformRef.current && !splitDragRef.current) {
@@ -6411,6 +6452,9 @@ export function WorkplaneViewport({
           handOverTouchToCamera();
           return;
         }
+      }
+      if ((event.pointerType === "touch" || event.pointerType === "pen") && event.button === 0 && !event.ctrlKey && !event.metaKey) {
+        startLongPress(event.pointerId, event.pointerType, event.clientX, event.clientY);
       }
       // The right button turns the view; only a press that is let go where it
       // started opens the menu (finishDrag). A pen's barrel button reports as
@@ -6884,11 +6928,15 @@ export function WorkplaneViewport({
       toFreePlacementWorkplanePoint,
       toRawPlanePoint,
       onAddShape,
-    ],
+    , startLongPress],
   );
 
   const handlePointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      const longPress = longPressRef.current;
+      if (longPress && longPress.pointerId === event.pointerId && Math.hypot(event.clientX - longPress.x, event.clientY - longPress.y) > LONG_PRESS_SLOP_PIXELS) {
+        cancelLongPress();
+      }
       // Gehoert die Flaeche gerade der Kamera, hat hier niemand etwas zu
       // schweben oder zu ziehen - die Finger bewegen die Ansicht.
       if (cameraTouchRef.current) return;
@@ -7080,7 +7128,7 @@ export function WorkplaneViewport({
         threeRef.current.needsRender = true;
       }
     },
-    [pickPlacementSurface, setMarqueeFromState, toPlacementWorkplanePoint, toRawPlanePoint, moveCruiseGhost, updateModifierEdgeHover, updateTapeHover, updateTransform],
+    [pickPlacementSurface, setMarqueeFromState, toPlacementWorkplanePoint, toRawPlanePoint, moveCruiseGhost, updateModifierEdgeHover, updateTapeHover, updateTransform, cancelLongPress],
   );
 
   useEffect(() => {
@@ -7167,6 +7215,24 @@ export function WorkplaneViewport({
     onInteractionActiveChange?.(false);
   }, [clearMoveDimensions, onInteractionActiveChange, setMarqueeFromState]);
 
+  useEffect(() => {
+    cancelGestureForCameraRef.current = cancelGestureForCamera;
+  }, [cancelGestureForCamera]);
+
+  useEffect(() => {
+    openContextMenuAtRef.current = (clientX, clientY, pointerType) => {
+      if (!onShapeContextMenu) return;
+      const shapeId = pickShape(clientX, clientY, pointerType);
+      if (shapeId && !selectedIdsRef.current.includes(shapeId)) onSelectShape(shapeId);
+      onShapeContextMenu({ shapeId, clientX, clientY });
+    };
+  }, [onSelectShape, onShapeContextMenu, pickShape]);
+
+  useEffect(() => () => {
+    const longPress = longPressRef.current;
+    if (longPress) window.clearTimeout(longPress.timer);
+  }, []);
+
   const handlePointerLeave = useCallback(() => {
     if (workplaneModeRef.current) {
       syncWorkplaneHoverPreview(threeRef.current, null, workspaceRef.current, resolvedThemeRef.current);
@@ -7193,6 +7259,14 @@ export function WorkplaneViewport({
       if (event.pointerType === "touch") {
         touchPointersRef.current.delete(event.pointerId);
         if (touchPointersRef.current.size === 0) cameraTouchRef.current = false;
+      }
+      if (longPressRef.current?.pointerId === event.pointerId) cancelLongPress();
+      if (longPressFiredRef.current === event.pointerId) {
+        // The menu is open; lifting the finger must not also select or drop anything.
+        longPressFiredRef.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+        if (threeRef.current) threeRef.current.controls.enabled = true;
+        return;
       }
       const state = threeRef.current;
       const splitDrag = splitDragRef.current;
@@ -7343,7 +7417,7 @@ export function WorkplaneViewport({
       }
       onInteractionActiveChange?.(false);
     },
-    [clearMoveDimensions, onDuplicateShapesMoved, onInteractionActiveChange, onSelectShape, onUpdateShape, rememberResizeAnchor, setMarqueeFromState, shapesInMarquee, suppressCornerEditAfterDrag, suppressLiftEditAfterDrag, onShapeContextMenu, pickShape],
+    [clearMoveDimensions, onDuplicateShapesMoved, onInteractionActiveChange, onSelectShape, onUpdateShape, rememberResizeAnchor, setMarqueeFromState, shapesInMarquee, suppressCornerEditAfterDrag, suppressLiftEditAfterDrag, onShapeContextMenu, pickShape, cancelLongPress],
   );
 
   const handleDrop = useCallback(

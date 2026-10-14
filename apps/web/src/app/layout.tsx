@@ -42,6 +42,9 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   applicationName: NAME,
   manifest: "/manifest.webmanifest",
+  // Added to the Home Screen on an iPad, layerling opens full screen like an app.
+  appleWebApp: { capable: true, title: NAME, statusBarStyle: "default" },
+  other: { "mobile-web-app-capable": "yes" },
   icons: {
     // Das SVG ist das eigentliche Symbol; die .ico steht daneben fuer alles,
     // was stur /favicon.ico abholt, statt in den Kopf zu sehen.
@@ -71,6 +74,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
   // Faerbt die Leiste des Browsers und, wenn layerling als App laeuft, deren
   // Titelzeile. Die Werte sind die der Werkzeugleiste, hell wie dunkel.
   themeColor: [
