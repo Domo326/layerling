@@ -100,6 +100,11 @@ export function isPencilMode(): boolean {
   return state.pencilMode;
 }
 
+/** Touch mode: fingers edit what they land on and turn the view on the empty plate. */
+export function isTouchMode(): boolean {
+  return !state.pencilMode;
+}
+
 /** True while a pen is pressed against the screen. */
 export function isPenDown(): boolean {
   return activePens.size > 0;

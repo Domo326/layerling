@@ -27,7 +27,8 @@ import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettings
 import { appThemePalette, type AppThemePalette, type AppThemePreference, type ResolvedAppTheme } from "@/lib/appTheme";
 import { cadModifierPrimitiveForBakedShape, cadTransformFromMatrix, cadTransformToMatrix } from "@/lib/cadBakeMetadata";
 import { t } from "@/lib/i18n";
-import { isPencilMode } from "@/lib/tabletInput";
+import { isPencilMode, isTouchMode } from "@/lib/tabletInput";
+import { isPhoneModeActive, subscribePhoneMode } from "@/lib/phoneMode";
 import type { ModelSplitPlane } from "@/lib/modelSplit";
 import { useLanguage } from "@/lib/useLanguage";
 import { orthographicFramingZoom, perspectiveFramingDistance } from "@/lib/cameraFraming";
@@ -256,6 +257,8 @@ const PICK_TOLERANCE_PIXELS_TOUCH = 16;
 const LONG_PRESS_MS = 520;
 /** Movement allowed during that rest before it counts as a drag instead. */
 const LONG_PRESS_SLOP_PIXELS = 10;
+/** Rings searched around a fingertip for a transform handle it nearly hit. */
+const TOUCH_HANDLE_SEARCH_RADII = [10, 20];
 const PICK_TOLERANCE_RAYS = 8;
 const RENDER_LAYER_MODIFIERS = 3;
 const RENDER_LAYER_PREVIEWS = 4;
@@ -3008,7 +3011,17 @@ export function WorkplaneViewport({
   const [tapeMoveMode, setTapeMoveMode] = useState(false);
   const [tapeToolsOpen, setTapeToolsOpen] = useState(false);
   const [tapeClearPending, setTapeClearPending] = useState(false);
-  const [cameraControlsCollapsed, setCameraControlsCollapsed] = useState(false);
+  const [cameraControlsCollapsed, setCameraControlsCollapsed] = useState(() => isPhoneModeActive());
+  // Switching into phone mode tucks the camera buttons away; they open with one tap.
+  useEffect(() => {
+    let wasPhone = isPhoneModeActive();
+    if (wasPhone) setCameraControlsCollapsed(true);
+    return subscribePhoneMode(() => {
+      const phone = isPhoneModeActive();
+      if (phone && !wasPhone) setCameraControlsCollapsed(true);
+      wasPhone = phone;
+    });
+  }, []);
   const language = useLanguage();
   const [orthographicView, setOrthographicView] = useState(false);
   // Hides the whole plate - grid, labels and any face workplane - for a clear
@@ -6366,7 +6379,21 @@ export function WorkplaneViewport({
     setHoverModifierEdgeId((current) => (current === null ? current : null));
   }, []);
 
-  const pickTransformHandle = useCallback((clientX: number, clientY: number) => {
+  const pickTransformHandle = useCallback((clientX: number, clientY: number, pointerType = "mouse") => {
+    const exact = pickTransformHandleAt(clientX, clientY);
+    if (exact || pointerType !== "touch") return exact;
+    // A fingertip covers the small handles; look around it in two rings.
+    for (const radius of TOUCH_HANDLE_SEARCH_RADII) {
+      for (let step = 0; step < 8; step += 1) {
+        const angle = (step / 8) * Math.PI * 2;
+        const near = pickTransformHandleAt(clientX + Math.cos(angle) * radius, clientY + Math.sin(angle) * radius);
+        if (near) return near;
+      }
+    }
+    return null;
+  }, []);
+
+  const pickTransformHandleAt = useCallback((clientX: number, clientY: number) => {
     const state = threeRef.current;
     if (!state || selectedIdsRef.current.length !== 1) {
       return null;
@@ -6421,6 +6448,26 @@ export function WorkplaneViewport({
     longPressRef.current = { pointerId, pointerType, x, y, timer };
   }, [cancelLongPress]);
 
+  /**
+   * Touch mode: is this finger on nothing it could edit? Tools that wait for a
+   * tap on the plate (placing a shape, tape measure, pivots, notes ...) keep
+   * every tap for themselves.
+   */
+  const fingerOnEmptyPlate = useCallback((clientX: number, clientY: number) => {
+    const state = threeRef.current;
+    if (!state) return false;
+    const toolWaitsForTap = Boolean(
+      cruiseAssetRef.current || carryIdsRef.current?.length || workplaneModeRef.current || splitActiveRef.current
+      || modifierActiveRef.current || tapeModeRef.current || tapeDeleteModeRef.current || tapeMoveModeRef.current
+      || noteModeRef.current || pivotPickModeRef.current || layFlatPickModeRef.current || mateFacePickRef.current
+      || cornerRulerModeRef.current || alignModeRef.current || mirrorModeRef.current
+      || (sectionMeasureModeRef.current && sectionSettingsRef.current.enabled),
+    );
+    if (toolWaitsForTap) return false;
+    if (pickTransformHandle(clientX, clientY, "touch")) return false;
+    return pickShape(clientX, clientY, "touch") === null;
+  }, [pickShape, pickTransformHandle]);
+
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       // Wer auf die Arbeitsflaeche klickt, ist mit dem Schreiben fertig. Von
@@ -6443,12 +6490,18 @@ export function WorkplaneViewport({
         touchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
         if (cameraTouchRef.current) return;
         // In Pencil mode the pen edits and every finger belongs to the camera.
-        const wantsCamera = touchPointersRef.current.size >= 2 || touchRotateRef.current || isPencilMode();
+        // In Touch mode a finger on a body or handle edits it; a finger on the
+        // empty plate turns the view, as a right-drag of the mouse would.
+        const wantsCamera = touchPointersRef.current.size >= 2
+          || touchRotateRef.current
+          || isPencilMode()
+          || (isTouchMode() && fingerOnEmptyPlate(event.clientX, event.clientY));
         // Wer gerade an einem Anfasser zieht, meint auch das - dann bleibt
         // alles, wie es ist.
         if (wantsCamera && !transformRef.current && !splitDragRef.current) {
           cancelGestureForCamera();
           cameraTouchRef.current = true;
+          state.touchGate.cameraOwnsTouches = true;
           handOverTouchToCamera();
           return;
         }
@@ -6601,7 +6654,7 @@ export function WorkplaneViewport({
         return;
       }
 
-      const handle = pickTransformHandle(event.clientX, event.clientY);
+      const handle = pickTransformHandle(event.clientX, event.clientY, event.pointerType);
       if (handle) {
         const shape = shapesRef.current.find((entry) => entry.id === handle.id);
         const activeWorkplane = placementWorkplaneRef.current;
@@ -6928,7 +6981,7 @@ export function WorkplaneViewport({
       toFreePlacementWorkplanePoint,
       toRawPlanePoint,
       onAddShape,
-    , startLongPress],
+    , startLongPress, fingerOnEmptyPlate],
   );
 
   const handlePointerMove = useCallback(
@@ -7258,7 +7311,15 @@ export function WorkplaneViewport({
       }
       if (event.pointerType === "touch") {
         touchPointersRef.current.delete(event.pointerId);
-        if (touchPointersRef.current.size === 0) cameraTouchRef.current = false;
+        if (touchPointersRef.current.size === 0) {
+          cameraTouchRef.current = false;
+          if (threeRef.current) {
+            threeRef.current.touchGate.cameraOwnsTouches = false;
+            // Every finger is off the glass: the camera is free again for the
+            // mouse, the wheel and the next hand-over.
+            threeRef.current.controls.enabled = true;
+          }
+        }
       }
       if (longPressRef.current?.pointerId === event.pointerId) cancelLongPress();
       if (longPressFiredRef.current === event.pointerId) {
@@ -8882,6 +8943,7 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     sectionPlaneHelper: null,
     lights: { ambient, key, fill },
     disposeInteractionListeners: () => {},
+    touchGate: { cameraOwnsTouches: false },
     resize,
   };
   const requestRender = () => {
@@ -8940,6 +9002,13 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
   const preventContextMenu = (event: MouseEvent) => {
     event.preventDefault();
   };
+  // Runs before OrbitControls' own listener: a real finger the camera does not
+  // own yet is hidden from it (the editor hands it over itself if it wants).
+  const gateTouchForCamera = (event: PointerEvent) => {
+    if (event.pointerType === "touch" && event.isTrusted && !state.touchGate.cameraOwnsTouches) {
+      controls.enabled = false;
+    }
+  };
   /**
    * Safaris eigene Zwei-Finger-Geste abwenden.
    *
@@ -8962,6 +9031,7 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
   controls.addEventListener("change", requestRender);
   SAFARI_GESTURES.forEach((name) => renderer.domElement.addEventListener(name, preventSafariGesture));
   renderer.domElement.addEventListener("pointerdown", configureLayerlingMouseButtons, { capture: true });
+  renderer.domElement.addEventListener("pointerdown", gateTouchForCamera, { capture: true });
   renderer.domElement.addEventListener("pointerup", resetLayerlingMouseButtons);
   renderer.domElement.addEventListener("pointercancel", resetLayerlingMouseButtons);
   renderer.domElement.addEventListener("contextmenu", preventContextMenu);
@@ -8977,6 +9047,7 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
     renderer.domElement.removeEventListener("wheel", pullPivotToSurface, { capture: true });
     controls.removeEventListener("change", requestRender);
     renderer.domElement.removeEventListener("pointerdown", configureLayerlingMouseButtons, { capture: true });
+    renderer.domElement.removeEventListener("pointerdown", gateTouchForCamera, { capture: true });
     renderer.domElement.removeEventListener("pointerup", resetLayerlingMouseButtons);
     renderer.domElement.removeEventListener("pointercancel", resetLayerlingMouseButtons);
     renderer.domElement.removeEventListener("contextmenu", preventContextMenu);

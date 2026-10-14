@@ -96,6 +96,14 @@ export type ThreeState = {
   /** The scene's lights, so the settings can change how punchy the shading is. */
   lights: { ambient: THREE.HemisphereLight; key: THREE.DirectionalLight; fill: THREE.DirectionalLight };
   disposeInteractionListeners: () => void;
+  /**
+   * Fingers belong to the camera only when the editor hands them over. While
+   * this is false, a new finger is kept away from OrbitControls; otherwise it
+   * would start turning the view under a body being dragged and, never seeing
+   * that finger lift, count it as still down - the next single finger then
+   * zoomed instead of turning.
+   */
+  touchGate: { cameraOwnsTouches: boolean };
   resize: () => void;
 };
 

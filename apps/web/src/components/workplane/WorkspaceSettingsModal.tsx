@@ -1,9 +1,11 @@
 "use client";
 
 import { GuideHelpLink } from "@/components/GuideHelpLink";
+import { getPhoneModeState, setPhoneModePreference, subscribePhoneMode, type PhoneModePreference } from "@/lib/phoneMode";
+import { getTabletInputState, setPencilMode, subscribeTabletInput } from "@/lib/tabletInput";
 import { MAX_OVERHANG_ANGLE, MIN_OVERHANG_ANGLE } from "@/lib/overhangLimits";
 import { Box as BoxIcon, ChevronDown, Grid3X3, History, Palette, Plus, RotateCcw, Ruler, Trash2, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useMovablePanel } from "@/lib/useMovablePanel";
 import { createPortal } from "react-dom";
 import { HexColorInput, HexColorPicker } from "react-colorful";
@@ -446,6 +448,8 @@ export function WorkspaceSettingsModal({
   const [defaultSaved, setDefaultSaved] = useState(false);
   useLanguage();
   const [activeSection, setActiveSection] = useState<WorkspaceSettingsSection>("appearance");
+  const phoneMode = useSyncExternalStore(subscribePhoneMode, getPhoneModeState, getPhoneModeState);
+  const tabletInput = useSyncExternalStore(subscribeTabletInput, getTabletInputState, getTabletInputState);
   const toolbarSize = useToolbarSize();
   const [selectedShapeKind, setSelectedShapeKind] = useState<ShapeKind>(toolbarShapeAssets[0].kind);
   const [dimensionDrafts, setDimensionDrafts] = useState(() => ({
@@ -727,6 +731,27 @@ export function WorkspaceSettingsModal({
                           {t(TOOLBAR_SIZE_LABEL_KEYS[size])}
                         </option>
                       ))}
+                    </select>
+                  </label>
+                  <label className="workspace-select">
+                    <span>{t("workspace.phoneLayout")}</span>
+                    <select
+                      value={phoneMode.preference}
+                      onChange={(event) => setPhoneModePreference(event.currentTarget.value as PhoneModePreference)}
+                    >
+                      <option value="auto">{t("workspace.phoneLayoutAuto")}</option>
+                      <option value="on">{t("workspace.phoneLayoutOn")}</option>
+                      <option value="off">{t("workspace.phoneLayoutOff")}</option>
+                    </select>
+                  </label>
+                  <label className="workspace-select">
+                    <span>{t("workspace.inputMode")}</span>
+                    <select
+                      value={tabletInput.pencilMode ? "pencil" : "touch"}
+                      onChange={(event) => setPencilMode(event.currentTarget.value === "pencil")}
+                    >
+                      <option value="touch">{t("workspace.inputTouch")}</option>
+                      <option value="pencil">{t("workspace.inputPencil")}</option>
                     </select>
                   </label>
                   <ColorSettingControl

@@ -16262,3 +16262,271 @@ html[data-theme="dark"] .top-action-body .icon-tag-ok {
     display: none;
   }
 }
+
+/* ==========================================================================
+   Phone layout (html[data-phone="on"], see lib/phoneMode.ts)
+   The plate gets the screen: tools fold behind the Tools button, the
+   properties become a pull-up drawer, the footer goes, overlays shrink.
+   ========================================================================== */
+
+html[data-phone="on"] {
+  --editor-footer-height: 0px;
+  --phone-bar-space: calc(64px + env(safe-area-inset-bottom, 0px));
+}
+
+html[data-phone="on"] .dashboard-legal.editor-legal {
+  display: none;
+}
+
+/* Title row: logo mark only, compact tabs, theme as an icon, no language picker. */
+html[data-phone="on"] .toolbar-brand-text,
+html[data-phone="on"] .toolbar-title-row .language-switch,
+html[data-phone="on"] .toolbar-title-row .theme-switch-label,
+html[data-phone="on"] .toolbar-title-row .theme-chevron {
+  display: none;
+}
+
+html[data-phone="on"] .toolbar-brand {
+  width: auto;
+  min-width: 0;
+  padding: 0 6px 0 10px;
+}
+
+html[data-phone="on"] .toolbar-workspace-tabs {
+  margin-left: 2px;
+}
+
+html[data-phone="on"] .toolbar-workspace-tabs button {
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+html[data-phone="on"] .toolbar-title-row-actions {
+  margin: 0 8px 0 auto;
+  gap: 4px;
+}
+
+/* The ribbon, folded: nothing but an open shape library is shown, and the
+   empty box takes no room and no touches. */
+html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content {
+  height: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content .shape-menu-dropdown {
+  pointer-events: auto;
+}
+
+/* The ribbon, folded: nothing but an open shape library is shown. */
+html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content .toolbar-section,
+html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content .toolbar-spacer {
+  display: none;
+}
+
+html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content .toolbar-shapes-section:has(.shape-menu-dropdown) {
+  display: block;
+}
+
+html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-shapes-section:has(.shape-menu-dropdown) > .toolbar-section-label,
+html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-shapes-section:has(.shape-menu-dropdown) > .toolbar-section-tools {
+  display: none;
+}
+
+/* The ribbon, unfolded: laid over the plate, scrolls if it is taller than the screen. */
+html[data-phone="on"][data-phone-tools="open"] .toolbar-mode-content {
+  position: fixed;
+  top: var(--editor-toolbar-title-height);
+  right: 0;
+  left: 0;
+  z-index: 40;
+  max-height: calc(100dvh - var(--editor-toolbar-title-height) - var(--phone-bar-space) - 8px);
+  overflow-y: auto;
+  padding-bottom: 8px;
+  background: var(--toolbar-bg, var(--topbar));
+  border-bottom: 1px solid var(--toolbar-edge, var(--border));
+  box-shadow: 0 12px 28px rgba(66, 47, 26, 0.22);
+  overscroll-behavior: contain;
+}
+
+/* The shape library as a sheet between the title row and the bottom bar. */
+html[data-phone="on"] .shape-menu-dropdown {
+  position: fixed;
+  top: calc(var(--editor-toolbar-title-height) + 6px);
+  right: 6px;
+  bottom: calc(var(--phone-bar-space) + 6px);
+  left: 6px;
+  width: auto;
+  max-height: none;
+  overflow-y: auto;
+  border-radius: 14px;
+  overscroll-behavior: contain;
+}
+
+/* Properties as a drawer above the bottom bar; folded it is just its header. */
+html[data-phone="on"] .shape-inspector {
+  position: fixed;
+  top: auto !important;
+  right: 6px !important;
+  bottom: calc(var(--phone-bar-space) + 6px) !important;
+  left: 6px !important;
+  z-index: 30;
+  width: auto;
+  max-height: 52dvh;
+  transform: none !important;
+  border-radius: 14px;
+  box-shadow: 0 -6px 24px rgba(66, 47, 26, 0.18);
+  overscroll-behavior: contain;
+}
+
+html[data-phone="on"] .shape-inspector.minimized {
+  max-height: none;
+}
+
+/* Landscape phone: the drawer becomes a side panel, so the plate stays in view. */
+@media (orientation: landscape) {
+  html[data-phone="on"] .shape-inspector {
+    top: calc(var(--editor-toolbar-height) + 6px) !important;
+    left: auto !important;
+    width: min(320px, 46vw);
+    max-height: none;
+    box-shadow: -6px 0 24px rgba(66, 47, 26, 0.18);
+  }
+
+  html[data-phone="on"] .shape-inspector.minimized {
+    top: auto !important;
+  }
+}
+
+/* With properties showing, the snap grid picker would sit on top of them. */
+html[data-phone="on"] body:has(.shape-inspector:not(.minimized)) .grid-settings {
+  display: none;
+}
+
+/* Hint that the bottom bar scrolls sideways. */
+.tablet-bar.is-phone {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+}
+
+.tablet-bar.is-phone.is-scrolled-end {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/* Narrow phones: the mode chip shows only its icon. */
+@media (max-width: 480px) {
+  .tablet-bar.is-phone .tablet-bar-mode-label {
+    display: none;
+  }
+
+  .tablet-bar.is-phone .tablet-bar-key {
+    min-width: 38px;
+  }
+
+  .tablet-bar.is-phone .tablet-bar-modifier {
+    min-width: 44px;
+  }
+}
+
+html[data-phone="on"] .shape-inspector-header {
+  min-height: 44px;
+}
+
+/* Smaller view cube and camera column, tucked into the corner. */
+html[data-phone="on"] .view-cube {
+  top: 8px;
+  left: 6px;
+  /* zoom, not transform: a transform on the cube's box flattens its 3D faces. */
+  zoom: 0.68;
+}
+
+html[data-phone="on"] .camera-controls {
+  top: 72px;
+  left: 6px;
+}
+
+html[data-phone="on"] .editor-status {
+  top: calc(var(--editor-toolbar-height) + 10px);
+  left: 72px;
+  max-width: calc(100vw - 84px);
+}
+
+html[data-phone="on"] .grid-settings {
+  bottom: calc(var(--phone-bar-space) + 6px);
+  right: 8px;
+  font-size: 12px;
+}
+
+html[data-phone="on"] .edge-modifier-panel {
+  right: 6px;
+  left: 6px;
+  width: auto;
+  max-width: none;
+}
+
+/* The bottom bar becomes the phone's main toolbar. */
+.tablet-bar.is-phone {
+  right: 6px;
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  left: 6px;
+  max-width: none;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 5px 6px;
+  transform: none;
+  border-radius: 16px;
+}
+
+.tablet-bar.is-phone.is-collapsed {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tablet-bar.is-phone .tablet-bar-key {
+  min-width: 40px;
+  height: 42px;
+  padding: 0 6px;
+}
+
+.tablet-bar.is-phone .tablet-bar-modifier {
+  min-width: 46px;
+  font-size: 12px;
+}
+
+.tablet-bar-tools.is-on {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.tablet-bar-mode {
+  gap: 5px;
+  border-color: var(--border);
+  background: var(--tile);
+  font-size: 12px;
+}
+
+.tablet-bar-mode.is-pencil {
+  border-color: var(--filament-mint);
+  background: color-mix(in srgb, var(--filament-mint) 16%, var(--tile));
+  color: var(--filament-mint);
+}
+
+.tablet-bar-mode.is-touch {
+  border-color: var(--filament-aqua);
+  background: color-mix(in srgb, var(--filament-aqua) 14%, var(--tile));
+  color: var(--filament-aqua);
+}
+
+.tablet-bar-phone.is-on {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--tile));
+}

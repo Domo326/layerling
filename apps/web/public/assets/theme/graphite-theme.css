@@ -7683,6 +7683,67 @@ html[data-theme="dark"]:where([data-palette="graphite"]) .top-action-body .icon-
   color: var(--filament-mint);
 }
 
+html:where([data-theme="dark"][data-palette="graphite"])[data-phone="on"] {
+  --editor-footer-height: 0px;
+  --phone-bar-space: calc(64px + env(safe-area-inset-bottom, 0px));
+}
+
+html:where([data-theme="dark"][data-palette="graphite"])[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+html:where([data-theme="dark"][data-palette="graphite"])[data-phone="on"][data-phone-tools="open"] .toolbar-mode-content {
+  background: var(--toolbar-bg, var(--topbar));
+  border-bottom: 1px solid var(--toolbar-edge, var(--border));
+  box-shadow: 0 12px 28px rgba(50, 50, 50, 0.22);
+}
+
+html:where([data-theme="dark"][data-palette="graphite"])[data-phone="on"] .shape-inspector {
+  box-shadow: 0 -6px 24px rgba(50, 50, 50, 0.18);
+}
+
+@media (orientation: landscape) {
+  html:where([data-theme="dark"][data-palette="graphite"])[data-phone="on"] .shape-inspector {
+    box-shadow: -6px 0 24px rgba(50, 50, 50, 0.18);
+  }
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .tablet-bar.is-phone {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .tablet-bar-tools.is-on {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .tablet-bar-mode {
+  border-color: var(--border);
+  background: var(--tile);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .tablet-bar-mode.is-pencil {
+  border-color: var(--filament-mint);
+  background: color-mix(in srgb, var(--filament-mint) 16%, var(--tile));
+  color: var(--filament-mint);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .tablet-bar-mode.is-touch {
+  border-color: var(--filament-aqua);
+  background: color-mix(in srgb, var(--filament-aqua) 14%, var(--tile));
+  color: var(--filament-aqua);
+}
+
+:where(html[data-theme="dark"][data-palette="graphite"]) .tablet-bar-phone.is-on {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--tile));
+}
+
 :where(html[data-theme="dark"][data-palette="graphite"]) .toolbar-section-tools,
 :where(html[data-theme="dark"][data-palette="graphite"]) .toolbar-section .action-buttons {
   background: var(--toolbar-tile);

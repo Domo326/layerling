@@ -11911,6 +11911,12 @@ function SecondaryToolbar({
     const apply = () => {
       const styles = getComputedStyle(root);
       const title = parseFloat(styles.getPropertyValue("--editor-toolbar-title-height")) || 44;
+      // Phone mode folds the tools away (or lays them over the plate), so
+      // only the title row takes room above the workplane.
+      if (root.dataset.phone === "on") {
+        root.style.setProperty("--editor-toolbar-height", `${Math.round(title)}px`);
+        return;
+      }
       const minimum = parseFloat(styles.getPropertyValue("--editor-toolbar-tools-height")) || 76;
       const tools = content.offsetHeight;
       // A hidden editor measures nothing; it keeps the one-row height.
@@ -11919,8 +11925,11 @@ function SecondaryToolbar({
     apply();
     const observer = new ResizeObserver(apply);
     observer.observe(content);
+    const phoneObserver = new MutationObserver(apply);
+    phoneObserver.observe(root, { attributes: true, attributeFilter: ["data-phone"] });
     return () => {
       observer.disconnect();
+      phoneObserver.disconnect();
       root.style.removeProperty("--editor-toolbar-height");
     };
   }, []);

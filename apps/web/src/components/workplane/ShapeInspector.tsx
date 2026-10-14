@@ -1,6 +1,7 @@
 "use client";
 
 import { displayY, displayYTurn, insideZ, insideZTurn } from "@/lib/displayAxes";
+import { isPhoneModeActive } from "@/lib/phoneMode";
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { guideChapterForShape, guideSectionForShape } from "@/lib/guideLinks";
 import { ChevronDown, ChevronUp, Cylinder, Eye, EyeOff, FolderOpen, Grid3x3, Layers, Lock, Minus, Pencil, Plus, RotateCcw, Split, Tags, Unlock } from "lucide-react";
@@ -2306,7 +2307,8 @@ export function ShapeInspector({
   const [gearHelixOpen, setGearHelixOpen] = useState(true);
   const [colorOpen, setColorOpen] = useState(false);
   const { colors: recentColors, remember: rememberColor } = useRecentColors(SOLID_COLORS);
-  const [minimized, setMinimized] = useState(false);
+  // On a phone the panel starts folded to its header, so the plate stays visible.
+  const [minimized, setMinimized] = useState(() => isPhoneModeActive());
   // Renaming here works like the pencil in the object list.
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
