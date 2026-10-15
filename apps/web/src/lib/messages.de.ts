@@ -1787,6 +1787,8 @@ export const MESSAGES_DE: Record<MessageKey, string> = {
   "workspace.inputMode": "Touch-Eingabe",
   "workspace.inputTouch": "Touch: Finger bearbeiten und drehen die Ansicht",
   "workspace.inputPencil": "Stift: der Stift bearbeitet, Finger bewegen die Ansicht",
+  "ribbon.fold": "Werkzeugleiste ausblenden",
+  "ribbon.unfold": "Werkzeugleiste offen lassen",
   "quick.bar": "Schnellbefehle",
   "quick.duplicate": "Kopie",
   "quick.hole": "Loch",

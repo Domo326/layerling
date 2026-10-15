@@ -13,15 +13,18 @@ export type PhoneModeState = {
   preference: PhoneModePreference;
   /** The resolved state: is the compact layout on right now? */
   active: boolean;
-  /** Phone mode only: the full tool ribbon is unfolded over the plate. */
+  /** The person folded the tool ribbon away (any screen size). */
+  ribbonFolded: boolean;
+  /** Folded ribbon (phone mode or folded by hand): the full ribbon is dropped down over the plate. */
   toolsOpen: boolean;
 };
 
 const STORAGE_KEY = "layerling.phoneMode";
+const RIBBON_STORAGE_KEY = "layerling.ribbonFolded";
 /** Phones: narrow in portrait, or short in landscape. An iPad mini is neither. */
 const PHONE_QUERY = "(max-width: 600px), (max-height: 500px)";
 
-let state: PhoneModeState = { preference: "auto", active: false, toolsOpen: false };
+let state: PhoneModeState = { preference: "auto", active: false, ribbonFolded: false, toolsOpen: false };
 const listeners = new Set<() => void>();
 let installed = false;
 let media: MediaQueryList | null = null;
@@ -42,18 +45,38 @@ function resolve(preference: PhoneModePreference): boolean {
   return media?.matches ?? false;
 }
 
+/** The ribbon is folded on a phone, or wherever the person folded it. */
+export function isRibbonCompact(current: PhoneModeState = state): boolean {
+  return current.active || current.ribbonFolded;
+}
+
+function readRibbonFolded(): boolean {
+  try {
+    return window.localStorage.getItem(RIBBON_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function applyToDocument() {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.dataset.phone = state.active ? "on" : "off";
-  if (state.active && state.toolsOpen) root.dataset.phoneTools = "open";
+  if (isRibbonCompact()) root.dataset.ribbon = "folded";
+  else delete root.dataset.ribbon;
+  if (isRibbonCompact() && state.toolsOpen) root.dataset.phoneTools = "open";
   else delete root.dataset.phoneTools;
 }
 
 function setState(next: Partial<PhoneModeState>) {
   const merged = { ...state, ...next };
-  if (!merged.active) merged.toolsOpen = false;
-  if (merged.preference === state.preference && merged.active === state.active && merged.toolsOpen === state.toolsOpen) return;
+  if (!isRibbonCompact(merged)) merged.toolsOpen = false;
+  if (
+    merged.preference === state.preference
+    && merged.active === state.active
+    && merged.ribbonFolded === state.ribbonFolded
+    && merged.toolsOpen === state.toolsOpen
+  ) return;
   state = merged;
   applyToDocument();
   listeners.forEach((listener) => listener());
@@ -81,6 +104,16 @@ export function setPhoneModePreference(preference: PhoneModePreference) {
   setState({ preference, active: resolve(preference) });
 }
 
+/** Fold the tool ribbon away (or keep it open again); remembered on this device. */
+export function setRibbonFolded(folded: boolean) {
+  try {
+    window.localStorage.setItem(RIBBON_STORAGE_KEY, folded ? "1" : "0");
+  } catch {
+    // Not remembered.
+  }
+  setState({ ribbonFolded: folded, toolsOpen: false });
+}
+
 export function setPhoneToolsOpen(open: boolean) {
   setState({ toolsOpen: open });
 }
@@ -95,7 +128,7 @@ export function installPhoneMode(): () => void {
   installed = true;
   media = window.matchMedia?.(PHONE_QUERY) ?? null;
   const preference = readPreference();
-  state = { preference, active: resolve(preference), toolsOpen: false };
+  state = { preference, active: resolve(preference), ribbonFolded: readRibbonFolded(), toolsOpen: false };
   applyToDocument();
   listeners.forEach((listener) => listener());
   const onChange = () => setState({ active: resolve(state.preference) });

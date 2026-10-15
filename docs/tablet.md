@@ -25,6 +25,23 @@ layout** (Automatic / Always on / Off).
 - Footer, language picker and brand text are hidden; the view cube is smaller;
   the camera buttons start tucked away (tap **›** to open them).
 
+## More room for the model (any screen)
+
+- **⌃** in the top bar folds the whole toolbar (Home, Modify, Arrange,
+  Manage, Help …) away; only the 3D Editor / Sketch tabs stay.
+- **☰ Tools** then drops the toolbar down over the model for one pick and
+  tucks it away again afterwards.
+- **📌** brings the toolbar back for good. The choice is remembered; the
+  toolbar starts open until you fold it.
+
+## Icon names
+
+- **Hold** any icon (finger or Pencil) for a moment and its name pops up.
+  Lift while the name shows and nothing happens; a quick tap still runs it.
+  Works on greyed-out icons too.
+- **Hover** the Pencil over an icon (on iPads that support Pencil hover) to
+  see its name.
+
 ## Touch and Pencil modes
 
 Switch with the mode button in the bottom bar (☝️ Touch / ✏️ Pencil) or in

@@ -16308,7 +16308,7 @@ html[data-phone="on"] .toolbar-title-row-actions {
 
 /* The ribbon, folded: nothing but an open shape library is shown, and the
    empty box takes no room and no touches. */
-html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content {
+html[data-ribbon="folded"]:not([data-phone-tools="open"]) .toolbar-mode-content {
   height: 0;
   min-height: 0;
   padding: 0;
@@ -16319,33 +16319,33 @@ html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content {
   pointer-events: none;
 }
 
-html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content .shape-menu-dropdown {
+html[data-ribbon="folded"]:not([data-phone-tools="open"]) .toolbar-mode-content .shape-menu-dropdown {
   pointer-events: auto;
 }
 
 /* The ribbon, folded: nothing but an open shape library is shown. */
-html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content .toolbar-section,
-html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content .toolbar-spacer {
+html[data-ribbon="folded"]:not([data-phone-tools="open"]) .toolbar-mode-content .toolbar-section,
+html[data-ribbon="folded"]:not([data-phone-tools="open"]) .toolbar-mode-content .toolbar-spacer {
   display: none;
 }
 
-html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-mode-content .toolbar-shapes-section:has(.shape-menu-dropdown) {
+html[data-ribbon="folded"]:not([data-phone-tools="open"]) .toolbar-mode-content .toolbar-shapes-section:has(.shape-menu-dropdown) {
   display: block;
 }
 
-html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-shapes-section:has(.shape-menu-dropdown) > .toolbar-section-label,
-html[data-phone="on"]:not([data-phone-tools="open"]) .toolbar-shapes-section:has(.shape-menu-dropdown) > .toolbar-section-tools {
+html[data-ribbon="folded"]:not([data-phone-tools="open"]) .toolbar-shapes-section:has(.shape-menu-dropdown) > .toolbar-section-label,
+html[data-ribbon="folded"]:not([data-phone-tools="open"]) .toolbar-shapes-section:has(.shape-menu-dropdown) > .toolbar-section-tools {
   display: none;
 }
 
 /* The ribbon, unfolded: laid over the plate, scrolls if it is taller than the screen. */
-html[data-phone="on"][data-phone-tools="open"] .toolbar-mode-content {
+html[data-ribbon="folded"][data-phone-tools="open"] .toolbar-mode-content {
   position: fixed;
   top: var(--editor-toolbar-title-height);
   right: 0;
   left: 0;
   z-index: 40;
-  max-height: calc(100dvh - var(--editor-toolbar-title-height) - var(--phone-bar-space) - 8px);
+  max-height: calc(100dvh - var(--editor-toolbar-title-height) - var(--phone-bar-space, 96px) - 8px);
   overflow-y: auto;
   padding-bottom: 8px;
   background: var(--toolbar-bg, var(--topbar));
@@ -16606,4 +16606,93 @@ html[data-phone="on"] .edge-modifier-panel {
     opacity: 0;
     transform: translateY(6px) scale(0.96);
   }
+}
+
+/* Icon names on touch screens: hold an icon, or hover the Pencil (ToolPeek). */
+.tool-peek {
+  position: fixed;
+  z-index: 200;
+  max-width: 220px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: #3b2c1d;
+  color: #fffaf2;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(40, 28, 15, 0.28);
+  transform: translate(-50%, -100%);
+  animation: tool-peek-in 110ms ease-out;
+}
+
+.tool-peek.is-below {
+  transform: translate(-50%, 0);
+}
+
+html[data-theme="dark"] .tool-peek {
+  background: #f6eadb;
+  color: #2b2116;
+}
+
+@keyframes tool-peek-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* No iOS text selection or callout while holding a toolbar icon. */
+.secondary-toolbar button,
+.tablet-bar button,
+.camera-controls button,
+.view-cube,
+.quick-action-bar button {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Fold the tool ribbon (RibbonFoldControls). */
+.ribbon-fold-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ribbon-fold-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--tile);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ribbon-fold-button:active {
+  transform: scale(0.95);
+}
+
+.ribbon-tools-button.is-on {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+}
+
+/* The ribbon dropped down over the plate on a tablet or computer: a sheet
+   under the title row instead of the full-width phone sheet. */
+html[data-ribbon="folded"][data-phone="off"][data-phone-tools="open"] .toolbar-mode-content {
+  max-height: calc(100dvh - var(--editor-toolbar-title-height) - 120px);
 }

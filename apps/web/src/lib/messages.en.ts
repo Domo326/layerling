@@ -1788,6 +1788,8 @@ export const MESSAGES_EN = {
   "workspace.inputMode": "Touch input",
   "workspace.inputTouch": "Touch: fingers edit and turn the view",
   "workspace.inputPencil": "Pencil: the pen edits, fingers move the view",
+  "ribbon.fold": "Hide the toolbar",
+  "ribbon.unfold": "Keep the toolbar open",
   "quick.bar": "Quick actions",
   "quick.duplicate": "Copy",
   "quick.hole": "Hole",

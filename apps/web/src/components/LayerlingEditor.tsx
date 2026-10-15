@@ -3,6 +3,8 @@
 import { GuideHelpLink } from "@/components/GuideHelpLink";
 import { TabletBar } from "@/components/TabletBar";
 import { QuickActionBar } from "@/components/QuickActionBar";
+import { RibbonFoldControls } from "@/components/RibbonFoldControls";
+import { ToolPeek } from "@/components/ToolPeek";
 import { AlertTriangle, Check, Percent, Circle as CircleIcon, CloudUpload, Download, Eye, EyeOff, FilePlus2, FolderOpen, Hexagon as HexagonIcon, Info, ListTree, Pencil, Pentagon as PentagonIcon, Search, Square as SquareIcon, Star as StarIcon, Triangle as TriangleIcon, X } from "lucide-react";
 import { ObjectListPanel } from "@/components/workplane/ObjectListPanel";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -11013,6 +11015,7 @@ export function LayerlingEditor({
           />
         ) : null}
         {editorOpen ? <TabletBar /> : null}
+        {editorOpen ? <ToolPeek /> : null}
         {editorOpen && historyViewIndex === null && !sketchActive ? (
           <QuickActionBar
             selectionCount={selectedShapes.length}
@@ -11929,7 +11932,7 @@ function SecondaryToolbar({
       const title = parseFloat(styles.getPropertyValue("--editor-toolbar-title-height")) || 44;
       // Phone mode folds the tools away (or lays them over the plate), so
       // only the title row takes room above the workplane.
-      if (root.dataset.phone === "on") {
+      if (root.dataset.ribbon === "folded") {
         root.style.setProperty("--editor-toolbar-height", `${Math.round(title)}px`);
         return;
       }
@@ -11942,7 +11945,7 @@ function SecondaryToolbar({
     const observer = new ResizeObserver(apply);
     observer.observe(content);
     const phoneObserver = new MutationObserver(apply);
-    phoneObserver.observe(root, { attributes: true, attributeFilter: ["data-phone"] });
+    phoneObserver.observe(root, { attributes: true, attributeFilter: ["data-phone", "data-ribbon"] });
     return () => {
       observer.disconnect();
       phoneObserver.disconnect();
@@ -12882,6 +12885,7 @@ function SecondaryToolbar({
           </label>
         </div>
         <div className="toolbar-title-row-actions">
+          <RibbonFoldControls />
           <ThemeSwitch />
           <LanguageSwitch />
         </div>

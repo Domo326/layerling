@@ -17,6 +17,7 @@ beforeEach(async () => {
   window.localStorage.clear();
   delete document.documentElement.dataset.phone;
   delete document.documentElement.dataset.phoneTools;
+  delete document.documentElement.dataset.ribbon;
   phoneSized = false;
   mediaListeners.clear();
   window.matchMedia = ((query: string) => ({
@@ -73,3 +74,33 @@ describe("phone mode", () => {
     expect(document.documentElement.dataset.phoneTools).toBeUndefined();
   });
 });
+
+describe("folding the toolbar by hand", () => {
+  it("folds on a tablet, drops down for one pick, and is remembered", async () => {
+    uninstall = phone.installPhoneMode();
+    expect(document.documentElement.dataset.ribbon).toBeUndefined();
+    phone.setRibbonFolded(true);
+    expect(document.documentElement.dataset.ribbon).toBe("folded");
+    expect(document.documentElement.dataset.phone).toBe("off");
+    phone.togglePhoneTools();
+    expect(document.documentElement.dataset.phoneTools).toBe("open");
+    expect(window.localStorage.getItem("layerling.ribbonFolded")).toBe("1");
+
+    uninstall();
+    vi.resetModules();
+    phone = await import("@/lib/phoneMode");
+    uninstall = phone.installPhoneMode();
+    expect(phone.getPhoneModeState().ribbonFolded).toBe(true);
+    expect(phone.getPhoneModeState().toolsOpen).toBe(false);
+  });
+
+  it("unfolding closes the drop-down and clears the fold", () => {
+    uninstall = phone.installPhoneMode();
+    phone.setRibbonFolded(true);
+    phone.togglePhoneTools();
+    phone.setRibbonFolded(false);
+    expect(document.documentElement.dataset.ribbon).toBeUndefined();
+    expect(document.documentElement.dataset.phoneTools).toBeUndefined();
+  });
+});
+
